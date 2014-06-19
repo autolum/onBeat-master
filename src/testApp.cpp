@@ -1,6 +1,7 @@
 #include "testApp.h"
 #define BARK_MAX 25
 float bins[BARK_MAX];
+float binsold[BARK_MAX];
 int bark(float f) {
     float b = 13 * atan(0.00076 * f) + 3.5 * atan(pow(f / 7500.0f, 2));
     return ((int)floor(b));
@@ -14,7 +15,7 @@ void testApp::setup() {
 	ofSetVerticalSync(true);
 	
     gui = new ofxUICanvas(0,(ofGetHeight()-220),(ofGetWidth()-10),60);
-    vslide = gui->addBiLabelSlider("fpsTresh", "fpsTreshold", "60", 1.0, 1000, &fpsTresh);
+    vslide = gui->addBiLabelSlider("fpsTresh", "fpsTreshold", "1", 1.0, 1000, &fpsTresh);
     vslide->setColorBack(ofColor(50,0,0,20));
     vslide->setColorFill(ofColor(52,175,195,100));
     vslide->setColorFillHighlight(ofColor(52,175,195,100));
@@ -29,7 +30,7 @@ void testApp::setup() {
 	//fft = ofxFft::create(bufferSize, OF_FFT_WINDOW_HAMMING);
 	// To use FFTW, try:
 	fft = ofxFft::create(bufferSize, OF_FFT_WINDOW_HANN, OF_FFT_FFTW);
-	
+ 
     drawBins.resize(fft->getBinSize());
     middleBins.resize(fft->getBinSize());
     audioBins.resize(fft->getBinSize());
@@ -38,6 +39,8 @@ void testApp::setup() {
     tBuffer3.resize(tBl,0.0);
     tBuffer4.resize(tBl,0.0);
     tBeat.resize(tBl,false);
+    
+    
 	
 	// 0 output channels,
 	// 1 input channel
@@ -50,7 +53,7 @@ void testApp::setup() {
 	ofBackground(0, 0, 0);
     
     fftSmoothed = new float[8192];
-    memset(fftSmoothed, 0x00, sizeof(float) * 8192);
+    memset(fftSmoothed, 0x00, sizeof(float) * 8192 );
     float freq_spc = 44100 / (float)bufferSize;
 
 	for (int i = 0; i < bufferSize; i++) {
@@ -58,7 +61,10 @@ void testApp::setup() {
         barkmap[i] = bidx;
     }
     
-    
+    tBuffer1B.resize(tBl,0.0);
+    tBuffer2B.resize(tBl,0.0);
+    tBuffer3B.resize(tBl,0.0);
+    tBuffer4B.resize(tBl,0.0);
 }
 
 void testApp::draw() {
@@ -73,11 +79,18 @@ void testApp::draw() {
 	ofDrawBitmapString(msg, ofGetWidth() - 80, ofGetHeight() - 20);
     ofSetColor(255, 255, 255);
    // bargraph(tBuffer1,10.0, 32, 512, 800, 128);
-    bargraph(tBuffer2,50.0, 32, 256, 800, 128);
+    bargraph(tBuffer2,50.0, 32, 200, 800, 128);
     ofSetColor(255, 255, 0);
-    bargraph(tBuffer3,50.0, 32, 256, 800, 128);
+    bargraph(tBuffer3,50.0, 32, 200, 800, 128);
     ofSetColor(255, 0, 0);
-   bargraph(tBuffer4,50.0, 32, 256, 800, 128);
+    bargraph(tBuffer4,50.0, 32, 200, 800, 128);
+    
+    ofSetColor(255, 255, 255);
+    bargraphB(tBuffer2B,50.0, 32, 400, 800, 128);
+    ofSetColor(255, 255, 0);
+    bargraphB(tBuffer3B,50.0, 32, 400, 800, 128);
+    ofSetColor(255, 0, 0);
+    bargraphB(tBuffer4B,50.0, 32, 400, 800, 128);
 }
 
 void testApp::update(){
@@ -87,12 +100,12 @@ void testApp::update(){
      float nrg = 0.0;
     float sdiff = 0.0;
     float diff = 0.0;
-    cout<<sizeof(bins)<<cout;
+   // cout<<sizeof(bins)<<cout;
 
-    for (int i = 0; i < middleBins.size()/50; i++){
+    for (int i = 0; i < middleBins.size()/45; i++){
         nrg += middleBins[i];
         diff = drawBins[i]-middleBins[i];
-        sdiff += (diff + abs(diff))*1;
+        sdiff += (diff + abs(diff))*0.5;
         //sdiff +=
     }
 
@@ -105,6 +118,24 @@ void testApp::update(){
         it++;
     }
     summ/=fpsTresh;
+    
+   
+   //  cout<<nrg<<"..."<<diff<<cout;
+    
+    //cout << ' ' << nrg;
+    tBuffer1.push_front(nrg);
+    tBuffer1.pop_back();
+    tBuffer2.push_front(sdiff);
+    tBuffer2.pop_back();
+    tBuffer3.push_front(summ*2);
+    tBuffer3.pop_back();
+    float sd =sdiff-(summ*2);
+    tBuffer4.push_front(sd+abs(sd));
+    tBuffer4.pop_back();
+    
+    soundMutex.lock();
+	drawBins = middleBins;
+	soundMutex.unlock();
     
     float * val = fft->getAmplitude();
 	for (int i = 0; i < tBl; i++){
@@ -127,23 +158,43 @@ void testApp::update(){
         bins[idx] += fftSmoothed[i] * 20;
         
     }
-    //cout<<bins<<cout;
     
-    //cout << ' ' << nrg;
-    tBuffer1.push_front(nrg);
-    tBuffer1.pop_back();
-    tBuffer2.push_front(sdiff);
-    tBuffer2.pop_back();
-    tBuffer3.push_front(summ*2);
-    tBuffer3.pop_back();
-    float sd =sdiff-(summ*2);
-    tBuffer4.push_front(sd+abs(sd));
-    tBuffer4.pop_back();
     
-    soundMutex.lock();
-	drawBins = middleBins;
-	soundMutex.unlock();
+    float nrgB = 0.0;
+    float sdiffB = 0.0;
+    float diffB = 0.0;
     
+    
+    for (int i = 0; i < 1; i++){
+        nrgB += bins[i];
+        diffB = binsold[i]-bins[i];
+        sdiffB += (diffB + abs(diffB))*0.5;
+        
+    }
+    
+     float summB = 0.0;
+    int iB = 1;
+    list<float>::iterator itB;
+    itB   = tBuffer2B.begin();
+    for (int i = 0; i < fpsTresh; i++){
+        summB += *itB;
+        itB++;
+    }
+    summB/=fpsTresh;
+  
+    tBuffer1B.push_front(nrgB);
+    tBuffer1B.pop_back();
+    tBuffer2B.push_front(sdiffB);
+    tBuffer2B.pop_back();
+    tBuffer3B.push_front(summB*1);
+    tBuffer3B.pop_back();
+    float sdB =sdiffB-(summB*1);
+    tBuffer4B.push_front(sdB+abs(sdB));
+    tBuffer4B.pop_back();
+    
+    for (int i = 0; i < BARK_MAX; i++){
+    binsold[i] = bins[i];
+    }
     
 }
 
@@ -181,6 +232,30 @@ void testApp::bargraph(list<float> vl, float sca, int px, int py, int w, int h) 
         //else ofSetColor(255,100);
         //ofRect(i*rw+px, py + h/2, 1, *it*10*sca);
         ofVertex(i*rw+px, py+h-*it*sca);
+        i++;
+    }
+    ofEndShape();
+}
+
+void testApp::bargraphB(list<float> vlB, float sca, int px, int py, int w, int h) {
+    
+    ofNoFill();
+    ofRect(px, py, w, h);
+    
+    int n = vlB.size();
+    float sum = 0.0;
+    
+    int rw = w/(n);
+    //int rw = 2;
+    //ofSetRectMode(OF_RECTMODE_CENTER);
+    
+    ofBeginShape();
+    int i = 0;
+    for (list<float>::iterator itB  = vlB.begin(); itB != vlB.end(); ++itB){
+        //if(*iit) ofSetColor(255,0,0,100);
+        //else ofSetColor(255,100);
+        //ofRect(i*rw+px, py + h/2, 1, *it*10*sca);
+        ofVertex(i*rw+px, py+h-*itB*sca);
         i++;
     }
     ofEndShape();
